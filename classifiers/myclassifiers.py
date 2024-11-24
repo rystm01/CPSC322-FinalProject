@@ -7,7 +7,7 @@ This file defines classifiers
 """
 
 
-import myutils
+from classifiers import myutils
 import numpy as np
 import operator
 
