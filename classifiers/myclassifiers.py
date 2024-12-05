@@ -235,11 +235,6 @@ class MyNaiveBayesClassifier:
                                  X_labels[j][k] and y_train[l] == y_labels[i])])/(self.priors[y_labels[i]]*total)
                                                                 
         
-        
-
-        
-
-
 
     def predict(self, X_test):
         """Makes predictions for test instances in X_test.
@@ -261,8 +256,6 @@ class MyNaiveBayesClassifier:
                     prob*=self.posteriors[i][label][x[i]]
                 probs.append(prob)
             y_predicted.append(y_labels[probs.index(max(probs))])
-
-        
 
         return y_predicted
 
