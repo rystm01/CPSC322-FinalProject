@@ -27,7 +27,7 @@ def get_frequencies(col):
         each unqiue value in col, frequencies[1] is the number of times that
         value appears 
     """
-    col_unique = sorted(list(set(col)))
+    col_unique = list(set(col))
     frequencies = [col_unique, []]
 
     for val in col_unique:
