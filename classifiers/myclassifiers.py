@@ -7,9 +7,16 @@ This file defines classifiers
 """
 
 
+from __future__ import division
 from classifiers import myutils
 import numpy as np
 import operator
+import numpy as np
+from scipy.stats import mode
+import random
+import numpy as np
+from scipy.stats import mode
+from myutils import *
 
 class MyKNeighborsClassifier:
     """Represents a simple k nearest neighbors classifier.
@@ -266,3 +273,178 @@ class MyNaiveBayesClassifier:
 
         return y_predicted
 
+
+
+
+class DecisionTreeClassifier(object):
+    """ A decision tree classifier.
+
+    A decision tree is a structure in which each node represents a binary
+    conditional decision on a specific feature, each branch represents the
+    outcome of the decision, and each leaf node represents a final
+    classification.
+    """
+
+    def __init__(self, max_features=lambda x: x, max_depth=10,
+                 min_samples_split=2):
+        """
+        Args:
+            max_features: A function that controls the number of features to
+                randomly consider at each split. The argument will be the number
+                of features in the data.
+            max_depth: The maximum number of levels the tree can grow downwards
+                before forcefully becoming a leaf.
+            min_samples_split: The minimum number of samples needed at a node to
+                justify a new node split.
+        """
+        self.max_features = max_features
+        self.max_depth = max_depth
+        self.min_samples_split = min_samples_split
+        self.trunk = None
+
+    def fit(self, X, y):
+        """ Builds the tree by choosing decision rules for each node based on
+        the data. """
+        n_features = X.shape[1]
+        n_sub_features = int(self.max_features(n_features))
+        feature_indices = random.sample(range(n_features), n_sub_features)
+        
+        self.trunk = self.build_tree(X, y, feature_indices, 0)
+
+    def predict(self, X):
+        """ Predict the class of each sample in X. """
+        num_samples = X.shape[0]
+        y_pred = np.empty(num_samples, dtype=int)
+        
+        for j in range(num_samples):
+            node = self.trunk
+            while isinstance(node, Node):
+                if X[j][node.feature_index] <= node.threshold:
+                    node = node.branch_true
+                else:
+                    node = node.branch_false
+            y_pred[j] = node
+
+        return y_pred
+
+    def build_tree(self, X, y, feature_indices, depth):
+        """ Recursively builds a decision tree. """
+        if depth == self.max_depth or len(y) < self.min_samples_split or entropy(y) == 0:
+            return mode(y)[0][0]
+        
+        feature_index, threshold = find_split(X, y, feature_indices)
+        X_true, y_true, X_false, y_false = split(X, y, feature_index, threshold)
+
+        if len(y_true) == 0 or len(y_false) == 0:
+            return mode(y)[0][0]
+
+        branch_true = self.build_tree(X_true, y_true, feature_indices, depth + 1)
+        branch_false = self.build_tree(X_false, y_false, feature_indices, depth + 1)
+
+        return Node(feature_index, threshold, branch_true, branch_false)
+
+def find_split(X, y, feature_indices):
+    """ Returns the best split rule for a tree node. """
+    best_gain = 0
+    best_feature_index = 0
+    best_threshold = 0
+
+    for feature_index in feature_indices:
+        values = sorted(set(X[:, feature_index])) 
+
+        for j in range(len(values) - 1): 
+            threshold = (values[j] + values[j + 1]) / 2 
+            X_true, y_true, X_false, y_false = split(X, y, feature_index, threshold)
+            gain = information_gain(y, y_true, y_false)
+
+            if gain > best_gain:
+                best_gain = gain
+                best_feature_index = feature_index
+                best_threshold = threshold
+
+    return best_feature_index, best_threshold
+
+class Node(object):
+    """ A node in a decision tree with the binary condition xi <= t. """
+    def __init__(self, feature_index, threshold, branch_true, branch_false):
+        self.feature_index = feature_index
+        self.threshold = threshold
+        self.branch_true = branch_true
+        self.branch_false = branch_false
+
+def split(X, y, feature_index, threshold):
+    """ Splits X and y based on the binary condition xi <= threshold. """
+    mask_true = X[:, feature_index] <= threshold
+    mask_false = ~mask_true
+
+    X_true = X[mask_true]
+    y_true = y[mask_true]
+    X_false = X[mask_false]
+    y_false = y[mask_false]
+
+    return X_true, y_true, X_false, y_false
+
+
+class RandomForestClassifier(object):
+    """ A random forest classifier.
+
+    A random forest is a collection of decision trees that vote on a
+    classification decision. Each tree is trained with a subset of the data and
+    features.
+    """
+
+    def __init__(self, n_estimators=32, max_features=np.sqrt, max_depth=10,
+                 min_samples_split=2, bootstrap=0.9):
+        """
+        Args:
+            n_estimators: The number of decision trees in the forest.
+            max_features: Controls the number of features to randomly consider
+                at each split.
+            max_depth: The maximum number of levels that the tree can grow
+                downwards before forcefully becoming a leaf.
+            min_samples_split: The minimum number of samples needed at a node to
+                justify a new node split.
+            bootstrap: The fraction of randomly chosen data to fit each tree on.
+        """
+        self.n_estimators = n_estimators
+        self.max_features = max_features
+        self.max_depth = max_depth
+        self.min_samples_split = min_samples_split
+        self.bootstrap = bootstrap
+        self.forest = []
+
+    def fit(self, X, y):
+        """ Creates a forest of decision trees using a random subset of data and
+            features. """
+        self.forest = []
+        n_samples = len(y)
+        n_sub_samples = round(n_samples * self.bootstrap)
+        
+        for i in range(self.n_estimators):
+            shuffle_in_unison(X, y)
+            X_subset = X[:n_sub_samples]
+            y_subset = y[:n_sub_samples]
+
+            tree = DecisionTreeClassifier(self.max_features, self.max_depth,
+                                          self.min_samples_split)
+            tree.fit(X_subset, y_subset)
+            self.forest.append(tree)
+
+    def predict(self, X):
+        """ Predict the class of each sample in X. """
+        n_samples = X.shape[0]
+        n_trees = len(self.forest)
+        predictions = np.empty([n_trees, n_samples])
+        for i in range(n_trees):
+            predictions[i] = self.forest[i].predict(X)
+
+        # Get the most common prediction
+        return mode(predictions, axis=0)[0][0] 
+
+    def score(self, X, y):
+        """ Return the accuracy of the prediction of X compared to y. """
+        y_predict = self.predict(X)
+        n_samples = len(y)
+        correct = np.sum(y_predict == y)
+        accuracy = correct / n_samples
+        return accuracy
