@@ -4,8 +4,9 @@ Ryan St. Mary
 """
 
 
-
 from __future__ import division
+
+from classifiers import myutils
 import random
 import numpy as np
 from scipy.stats import mode
@@ -37,6 +38,7 @@ class MyKNeighborsClassifier:
         Terminology: instance = sample = row and attribute = feature = column
         Assumes data has been properly normalized before use.
     """
+
     def __init__(self, n_neighbors=3):
         """Initializer for MyKNeighborsClassifier.
 
@@ -77,18 +79,24 @@ class MyKNeighborsClassifier:
         """
         distances = []
         neighbor_indices = []
-        
+
         for value in X_test:
             # [(distance, index)]
             if not categorical:
-                all_distances = [(euclidian_distance(value, train_val), index) for index, train_val in enumerate(self.X_train)]
+                all_distances = [
+                    (euclidian_distance(value, train_val), index)
+                    for index, train_val in enumerate(self.X_train)
+                ]
             else:
-                all_distances = [(sum(1 for i in range(len(value)) if value[i] != train[i]), index) for index, train in enumerate(self.X_train)]
-            
+                all_distances = [
+                    (sum(1 for i in range(len(value)) if value[i] != train[i]), index)
+                    for index, train in enumerate(self.X_train)
+                ]
+
             all_distances.sort(key=operator.itemgetter(0))
 
-            dist = [neighbor[0] for neighbor in all_distances[:self.n_neighbors]]
-            idx = [neighbor[1] for neighbor in all_distances[:self.n_neighbors]]
+            dist = [neighbor[0] for neighbor in all_distances[: self.n_neighbors]]
+            idx = [neighbor[1] for neighbor in all_distances[: self.n_neighbors]]
             distances.append(dist)
             neighbor_indices.append(idx)
             # print(value)
@@ -109,14 +117,12 @@ class MyKNeighborsClassifier:
         indexes = self.kneighbors(X_test, categorical)[1]
         y_predicted = []
 
-        
         for test in indexes:
             neighbors_classes = [self.y_train[i] for i in test]
             freqs = get_frequencies(neighbors_classes)
             y_predicted.append(freqs[0][freqs[1].index(max(freqs[1]))])
-        
-        return y_predicted
 
+        return y_predicted
 
 
 class MyDummyClassifier:
@@ -129,20 +135,19 @@ class MyDummyClassifier:
     Attributes:
         most_common_label(obj): whatever the most frequent class label in the
             y_train passed into fit()
-        strategy(string): most frequent or stratified. 
+        strategy(string): most frequent or stratified.
 
 
     Notes:
         Loosely based on sklearn's DummyClassifier:
             https://scikit-learn.org/stable/modules/generated/sklearn.dummy.DummyClassifier.html
     """
-    def __init__(self, strategy="most frequent"):
-        """Initializer for DummyClassifier.
 
-        """
+    def __init__(self, strategy="most frequent"):
+        """Initializer for DummyClassifier."""
         self.strategy = strategy
         self.most_common_label = None
-        
+
     def fit(self, X_train, y_train):
         """Fits a dummy classifier to X_train and y_train.
 
@@ -162,8 +167,6 @@ class MyDummyClassifier:
         elif self.strategy == "stratified":
             self.y_train = y_train
 
-
-
     def predict(self, X_test):
         """Makes predictions for test instances in X_test.
 
@@ -181,95 +184,145 @@ class MyDummyClassifier:
 
 
 class MyNaiveBayesClassifier:
-    """Represents a Naive Bayes classifier.
+    """
+    Represents a Naive Bayes classifier for categorical data.
 
     Attributes:
-        priors(dict): The prior probabilities computed for each label in the training set.
-        posteriors(dict): The posterior probabilities computed for each attribute value/label pair in the training set.
+        priors (dict): The prior probabilities computed for each label in the training set.
+            Format: {label: prior_probability}.
+        posteriors (dict): The posterior probabilities computed for each
+            attribute value/label pair in the training set.
+            Format: {attribute_index: {label: {attribute_value: posterior_probability}}}.
+        is_fitted (bool): Indicates whether the classifier has been fitted with training data.
+
+    Methods:
+        fit(X_train, y_train):
+            Fits the classifier to the training data by computing priors and posteriors.
+        predict(X_test):
+            Makes predictions for new data based on the computed priors and posteriors.
 
     Notes:
-        Loosely based on sklearn's Naive Bayes classifiers: https://scikit-learn.org/stable/modules/naive_bayes.html
-        You may add additional instance attributes if you would like, just be sure to update this docstring
-        Terminology: instance = sample = row and attribute = feature = column
+        - Loosely based on sklearn's Naive Bayes classifiers:
+          https://scikit-learn.org/stable/modules/naive_bayes.html
+        - Terminology:
+            - Instance = sample = row
+            - Attribute = feature = column
+        - This implementation assumes categorical data. For numerical attributes, discretization
+          or a Gaussian model would be necessary.
+
     """
 
     def __init__(self):
-        """Initializer for MyNaiveBayesClassifier."""
-        self.priors = {}
-        self.posteriors = {}
+        """
+        Initializes the Naive Bayes classifier.
+
+        Attributes:
+            - priors: Dictionary to store prior probabilities for each label.
+            - posteriors: Nested dictionary to store posterior probabilities.
+            - is_fitted: Boolean to indicate whether the model has been trained.
+        """
+        self.priors = {}  # {label: prior_probability}
+        self.posteriors = (
+            {}
+        )  # {attribute_index: {label: {attribute_value: posterior_probability}}}
+        self.is_fitted = False
 
     def fit(self, X_train, y_train):
-        """Fits a Naive Bayes classifier to X_train and y_train.
+        """
+        Fits the Naive Bayes classifier to the training data.
 
         Args:
-            X_train(list of list of obj): The list of training instances (samples)
-                The shape of X_train is (n_train_samples, n_features)
-            y_train(list of obj): The target y values (parallel to X_train)
-                The shape of y_train is n_train_samples
+            X_train (list of list of obj): A 2D list where each row is a training instance
+                and each column is a feature. Shape: (n_train_samples, n_features).
+            y_train (list of obj): A list of target labels, parallel to X_train.
+                Shape: (n_train_samples).
+
+        Raises:
+            ValueError: If X_train or y_train is empty.
+            ValueError: If X_train and y_train have mismatched lengths.
+            ValueError: If X_train is not a 2D list.
+            ValueError: If y_train contains no labels.
 
         Notes:
-            Since Naive Bayes is an eager learning algorithm, this method computes the prior probabilities
-                and the posterior probabilities for the training data.
-            You are free to choose the most appropriate data structures for storing the priors
-                and posteriors.
+            - Computes the prior probabilities for each label.
+            - Computes the posterior probabilities for each attribute value/label pair.
+            - Handles categorical data by estimating probabilities based on observed frequencies.
         """
-        from collections import defaultdict
+        if not X_train or not y_train:
+            raise ValueError("Training data (X_train and y_train) cannot be empty.")
+        if len(X_train) != len(y_train):
+            raise ValueError(
+                "X_train and y_train must have the same number of samples."
+            )
+        if not all(isinstance(row, list) for row in X_train):
+            raise ValueError("X_train must be a 2D list.")
+        if len(set(y_train)) == 0:
+            raise ValueError("y_train must contain at least one label.")
 
         total_samples = len(y_train)
-        label_counts = defaultdict(int)
+        unique_labels = set(y_train)
+        self.priors = {
+            label: y_train.count(label) / total_samples for label in unique_labels
+        }
+        n_features = len(X_train[0])
+        self.posteriors = {
+            i: {label: {} for label in unique_labels} for i in range(n_features)
+        }
+        for feature_index in range(n_features):
+            unique_values = set(row[feature_index] for row in X_train)
 
-        # Compute priors
-        for label in y_train:
-            label_counts[label] += 1
-        for label, count in label_counts.items():
-            self.priors[label] = count / total_samples
+            for label in unique_labels:
+                label_count = y_train.count(label)
 
-        # Initialize posteriors
-        self.posteriors = {label: [] for label in label_counts}
-
-        # Organize data by class
-        data_by_class = {label: [] for label in label_counts}
-        for x, label in zip(X_train, y_train):
-            data_by_class[label].append(x)
-
-        # Compute posteriors for each class
-        for label, instances in data_by_class.items():
-            attribute_counts = [defaultdict(int) for _ in range(len(X_train[0]))]
-            for instance in instances:
-                for i, value in enumerate(instance):
-                    attribute_counts[i][value] += 1
-            total_instances = len(instances)
-            for counts in attribute_counts:
-                probs = {
-                    value: count / total_instances for value, count in counts.items()
-                }
-                self.posteriors[label].append(probs)
+                for value in unique_values:
+                    count_value_label = sum(
+                        1
+                        for i in range(total_samples)
+                        if X_train[i][feature_index] == value and y_train[i] == label
+                    )
+                    self.posteriors[feature_index][label][value] = (
+                        count_value_label / label_count if label_count > 0 else 0
+                    )
+        self.is_fitted = True
 
     def predict(self, X_test):
-        """Makes predictions for test instances in X_test.
-        Args:
-            X_test(list of list of obj): The list of testing samples
-                The shape of X_test is (n_test_samples, n_features)
-        Returns:
-            y_predicted(list of obj): The predicted target y values (parallel to X_test)
         """
+        Makes predictions for test instances in X_test.
+
+        Args:
+            X_test (list of list of obj): A 2D list where each row is a test instance
+                and each column is a feature. Shape: (n_test_samples, n_features).
+
+        Returns:
+            list of obj: Predicted labels for each test instance, parallel to X_test.
+
+        Raises:
+            RuntimeError: If the classifier has not been fitted.
+            ValueError: If X_test is empty or not a 2D list.
+
+        Notes:
+            - Predictions are based on the maximum a posteriori probability (MAP) estimate.
+            - Handles categorical data only. For numerical data, preprocessing is required.
+        """
+
+        if not self.is_fitted:
+            raise RuntimeError(
+                "The classifier must be fitted before calling predict()."
+            )
+        if not X_test or not all(isinstance(row, list) for row in X_test):
+            raise ValueError("X_test must be a non-empty 2D list.")
         y_predicted = []
+
         for instance in X_test:
             label_probabilities = {}
             for label in self.priors:
-                probability = self.priors[label]
-                for i, value in enumerate(instance):
-                    probs = self.posteriors[label][i]
-                    probability *= probs.get(value, 0)
-                label_probabilities[label] = probability
-            # Handle the case where all probabilities are zero
-            if all(prob == 0 for prob in label_probabilities.values()):
-                best_label = max(self.priors, key=self.priors.get)
-            else:
-                best_label = max(label_probabilities, key=label_probabilities.get)
-            y_predicted.append(best_label)
-        return y_predicted
+                prob = self.priors[label]
+                for feature_index, value in enumerate(instance):
+                    prob *= self.posteriors[feature_index][label].get(value, 0)
+                label_probabilities[label] = prob
+            y_predicted.append(max(label_probabilities, key=label_probabilities.get))
 
+        return y_predicted
 
 
 class MyDecisionTreeClassifier:
@@ -282,6 +335,7 @@ class MyDecisionTreeClassifier:
             The shape of y_train is n_samples
         tree(nested list): The extracted tree model.
     """
+
     def __init__(self):
         """Initializer for MyDecisionTreeClassifier."""
         self.X_train = None
@@ -290,13 +344,13 @@ class MyDecisionTreeClassifier:
 
     def fit(self, X_train, y_train):
         """Fits a decision tree classifier to X_train and y_train using TDIDT."""
-        self.header = ['att' + str(i) for i in range(len(X_train[0]))]
+        self.header = ["att" + str(i) for i in range(len(X_train[0]))]
         self.attribute_domains = {}
         for att in self.header:
             col = get_column(X_train, self.header.index(att))
             col = list(set(col))
             self.attribute_domains[att] = col
-        
+
         train = [X_train[i] + [y_train[i]] for i in range(len(y_train))]
         availible_atts = deepcopy(self.header)
         self.tree = self.tdidt(train, availible_atts)
@@ -306,7 +360,7 @@ class MyDecisionTreeClassifier:
         node_type = tree[0]
         if node_type == "Leaf":
             return tree[1]
-        
+
         # attribute node case, match instance val to right subtree
         att_idx = self.header.index(tree[1])
         for i in range(2, len(tree)):
@@ -322,22 +376,25 @@ class MyDecisionTreeClassifier:
 
     def print_decision_rules(self, attribute_names=None, class_name="class"):
         """Prints the decision rules from the tree."""
-        rules = ''
+        rules = ""
         tree = deepcopy(self.tree)
-        
+
         for i in range(2, len(tree)):
-            rules += f'IF {tree[1]} == {tree[i][1]} '
+            rules += f"IF {tree[1]} == {tree[i][1]} "
             rules += self.print_decision_rules_rec(tree[i], attribute_names, class_name)
-            
+
         print(rules)
 
     def print_decision_rules_rec(self, tree, attribute_names=None, class_name="class"):
-        if tree[0] == 'Leaf':
-            return 'THEN ' + class_name + " = " + tree[1] + "\n"
-       
-        rules = ''
+        if tree[0] == "Leaf":
+            return "THEN " + class_name + " = " + tree[1] + "\n"
+
+        rules = ""
         for i in range(2, len(tree[2])):
-            rule = f' AND {tree[2][i]} == {tree[2][i]} ' + self.print_decision_rules_rec(tree[2][i], attribute_names, class_name)
+            rule = (
+                f" AND {tree[2][i]} == {tree[2][i]} "
+                + self.print_decision_rules_rec(tree[2][i], attribute_names, class_name)
+            )
             rules += rule
         return rules
 
@@ -350,22 +407,26 @@ class MyDecisionTreeClassifier:
         self.visualize_tree_rec(self.tree, outfile, attribute_names)
         outfile.write("}")
         os.popen(f"dot -Tpdf -o {pdf_fname} {dot_fname}")
-        
+
         # TODO: Implement further if required
 
     def visualize_tree_rec(self, tree, outfile, attribute_names=None):
         if tree[0] == "Attribute":
             if attribute_names:
-                outfile.write(f"node{self.part_count}[shape=box, label={attribute_names[attribute_names.index(tree[1])]}];\n")
+                outfile.write(
+                    f"node{self.part_count}[shape=box, label={attribute_names[attribute_names.index(tree[1])]}];\n"
+                )
             else:
                 outfile.write(f"node{self.part_count}[shape=box, label={tree[1]}];\n")
             self.part_count += 1
-            
+
             for i in range(len(tree[2:])):
-                self.visualize_tree_rec(tree[i+2], outfile, attribute_names)
+                self.visualize_tree_rec(tree[i + 2], outfile, attribute_names)
 
         elif tree[0] == "Value":
-            outfile.write(f"node{self.part_count-1}--node{self.part_count}[label={tree[1]}]\n")
+            outfile.write(
+                f"node{self.part_count-1}--node{self.part_count}[label={tree[1]}]\n"
+            )
             self.visualize_tree_rec(tree[2], outfile, attribute_names)
 
         elif tree[0] == "Leaf":
@@ -392,28 +453,39 @@ class MyDecisionTreeClassifier:
             vals = []
             val_entropies = []
             posteriors = []
-            val_col = get_column(current_instances, self.header.index(att))  
+            val_col = get_column(current_instances, self.header.index(att))
             for val in self.attribute_domains[att]:
                 vals.append(val)
                 try:
                     posteriors.append(
-                        sum([1 for i in range(len(val_col))
-                             if val_col[i] == val and current_instances[i][-1] == 'True']) 
+                        sum(
+                            [
+                                1
+                                for i in range(len(val_col))
+                                if val_col[i] == val
+                                and current_instances[i][-1] == "True"
+                            ]
+                        )
                         / sum([1 for i in val_col if i == val])
                     )
                 except:
                     posteriors.append(0)
-                
+
                 # Entropy calculation
                 if posteriors[-1] not in [0, 1]:
-                    val_entropies.append(0 - posteriors[-1]*np.log2(posteriors[-1]) 
-                                         - (1-posteriors[-1])*np.log2(1-posteriors[-1]))
+                    val_entropies.append(
+                        0
+                        - posteriors[-1] * np.log2(posteriors[-1])
+                        - (1 - posteriors[-1]) * np.log2(1 - posteriors[-1])
+                    )
                 else:
                     val_entropies.append(0)
-            
+
             avg = 0
             for i in range(len(vals)):
-                avg += (val_col.count(vals[i])/len(current_instances)) * val_entropies[i]
+                avg += (
+                    val_col.count(vals[i]) / len(current_instances)
+                ) * val_entropies[i]
             att_entropies.append(avg)
 
         # return attribute with smallest entropy
@@ -433,9 +505,14 @@ class MyDecisionTreeClassifier:
 
             # Case 1
             if len(att_partition) > 1 and all_same_class(att_partition):
-                leaf = ["Leaf", att_partition[0][-1],
-                        get_column(current_instances, self.header.index(split_att)).count(value),
-                        len(current_instances)]
+                leaf = [
+                    "Leaf",
+                    att_partition[0][-1],
+                    get_column(current_instances, self.header.index(split_att)).count(
+                        value
+                    ),
+                    len(current_instances),
+                ]
                 val_subtree.append(leaf)
                 tree.append(val_subtree)
 
@@ -443,7 +520,7 @@ class MyDecisionTreeClassifier:
             elif len(att_partition) > 0 and len(available_attributes) == 0:
                 vals, freqs = get_frequencies(get_column(current_instances, -1))
                 val = vals[freqs.index(max(freqs))]
-                leaf = ['Leaf', val, max(freqs), len(current_instances)]
+                leaf = ["Leaf", val, max(freqs), len(current_instances)]
                 val_subtree.append(leaf)
                 tree.append(val_subtree)
 
@@ -459,9 +536,8 @@ class MyDecisionTreeClassifier:
                 subtree = self.tdidt(att_partition, available_attributes.copy())
                 val_subtree.append(subtree)
                 tree.append(val_subtree)
-        
+
         return tree
-    
 
 
 class RandomForestClassifier:
@@ -515,7 +591,14 @@ class RandomForestClassifier:
             Calculates the accuracy of the classifier on the test dataset.
     """
 
-    def __init__(self, n_estimators=10, max_features="sqrt", max_depth=None, min_samples_split=2, bootstrap=True):
+    def __init__(
+        self,
+        n_estimators=10,
+        max_features="sqrt",
+        max_depth=None,
+        min_samples_split=2,
+        bootstrap=True,
+    ):
         """
         Initializes the RandomForestClassifier with the specified hyperparameters.
 
@@ -598,7 +681,7 @@ class RandomForestClassifier:
 
             # Train a decision tree
             tree = MyDecisionTreeClassifier()
-            tree.header = ['att' + str(i) for i in range(len(X[0]))]
+            tree.header = ["att" + str(i) for i in range(len(X[0]))]
             tree.fit(X_subset, y_subset)
             self.forest.append(tree)
 
@@ -619,7 +702,10 @@ class RandomForestClassifier:
             predictions.append(tree_predictions)
 
         # Transpose predictions to organize them per sample
-        predictions = [[predictions[j][i] for j in range(len(predictions))] for i in range(len(X_test))]
+        predictions = [
+            [predictions[j][i] for j in range(len(predictions))]
+            for i in range(len(X_test))
+        ]
 
         # Perform majority voting
         majority_votes = []
@@ -627,9 +713,9 @@ class RandomForestClassifier:
             vote_count = Counter(pred)
             majority_class = max(vote_count, key=vote_count.get)
             majority_votes.append(majority_class)
-        
+
         return majority_votes
-    
+
     def score(self, X_test, y_test):
         """
         Calculates the accuracy of the classifier on the test dataset.
@@ -651,5 +737,5 @@ class RandomForestClassifier:
             if pred == actual:
                 correct += 1
             total += 1
-        
+
         return correct / total
