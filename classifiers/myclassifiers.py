@@ -20,7 +20,7 @@ import numpy as np
 from collections import Counter
 import random
 from copy import deepcopy
-
+import os
 
 class MyKNeighborsClassifier:
     """Represents a simple k nearest neighbors classifier.
@@ -371,8 +371,13 @@ class MyDecisionTreeClassifier:
         """Makes predictions for test instances in X_test."""
         preds = []
         for val in X_test:
-            preds.append(self.tdidt_predict(self.tree, val))
+            prediction = self.tdidt_predict(self.tree, val)
+            # Replace None with "Other"
+            if prediction is None:
+                prediction = "OTHER"
+            preds.append(prediction)
         return preds
+
 
     def print_decision_rules(self, attribute_names=None, class_name="class"):
         """Prints the decision rules from the tree."""
@@ -640,7 +645,7 @@ class RandomForestClassifier:
         Raises:
             ValueError: If `max_features` has an unrecognized value.
         """
-        if isinstance(self.max_features, int):
+        if isinstance(self.max_features, (int, np.integer)):
             return self.max_features
         elif isinstance(self.max_features, float):
             return max(1, int(self.max_features * n_features))
