@@ -270,6 +270,101 @@ class MyNaiveBayesClassifier:
             y_predicted.append(best_label)
         return y_predicted
 
+class MyNaiveBayesClassifier:
+    """Represents a Naive Bayes classifier.
+
+    Attributes:
+        priors(YOU CHOOSE THE MOST APPROPRIATE TYPE): The prior probabilities computed for each
+            label in the training set.
+        posteriors(YOU CHOOSE THE MOST APPROPRIATE TYPE): The posterior probabilities computed for each
+            attribute value/label pair in the training set.
+
+    Notes:
+        Loosely based on sklearn's Naive Bayes classifiers: https://scikit-learn.org/stable/modules/naive_bayes.html
+        You may add additional instance attributes if you would like, just be sure to update this docstring
+        Terminology: instance = sample = row and attribute = feature = column
+    """
+    def __init__(self):
+        """Initializer for MyNaiveBayesClassifier.
+        """
+        self.priors = {} # label -> prior
+        self.posteriors = {} # att_idx - > labels -> -> x_label -> posterior
+
+    def fit(self, X_train, y_train):
+        """Fits a Naive Bayes classifier to X_train and y_train.
+
+        Args:
+            X_train(list of list of obj): The list of training instances (samples)
+                The shape of X_train is (n_train_samples, n_features)
+            y_train(list of obj): The target y values (parallel to X_train)
+                The shape of y_train is n_train_samples
+
+        Notes:
+            Since Naive Bayes is an eager learning algorithm, this method computes the prior probabilities
+                and the posterior probabilities for the training data.
+            You are free to choose the most appropriate data structures for storing the priors
+                and posteriors.
+        """
+        self.priors = {}
+        self.posteriors = {}
+        total = len(y_train)
+        y_labels = list(set(y_train))
+        
+        X_labels = []
+        for i in range(len(X_train[0])):
+            X_labels.append(list(set(get_column(X_train, i))))
+            self.posteriors[i] = {}
+            for label in y_labels:
+                self.posteriors[i][label] = {}
+
+        for label in y_labels:
+            self.priors[label] = y_train.count(label)/total
+            
+        
+        
+        """
+        posteriers = {0 : {{'yes' : {1 : val, 2 : val}, 'no' : {1 : val, 2 : val}}}}
+        """
+        
+        
+
+        for i in range(len(y_labels)):              # for each unqiue y
+            for j in range(len(X_labels)):          # for each attribute in X
+                for k in range(len(X_labels[j])):   # for each unique val in each att
+                    self.posteriors[j][y_labels[i]][X_labels[j][k]] = sum([1 for l in range(total) if (X_train[l][j] == 
+                                 X_labels[j][k] and y_train[l] == y_labels[i])])/(self.priors[y_labels[i]]*total)
+                                                                
+        
+        
+
+        
+
+
+
+    def predict(self, X_test):
+        """Makes predictions for test instances in X_test.
+
+        Args:
+            X_test(list of list of obj): The list of testing samples
+                The shape of X_test is (n_test_samples, n_features)
+
+        Returns:
+            y_predicted(list of obj): The predicted target y values (parallel to X_test)
+        """
+        y_predicted = []
+        y_labels = list(self.priors.keys())
+        for x in X_test:
+            probs = []
+            for label in y_labels:
+                prob = 1*self.priors[label]
+                for i in range(len(x)):
+                    prob*=self.posteriors[i][label][x[i]]
+                probs.append(prob)
+            y_predicted.append(y_labels[probs.index(max(probs))])
+
+        
+
+        return y_predicted
 
 
 class MyDecisionTreeClassifier:
