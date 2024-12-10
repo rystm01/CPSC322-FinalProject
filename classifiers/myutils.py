@@ -7,9 +7,7 @@ from __future__ import division
 from collections import Counter
 import random
 import numpy as np
-
-
-import numpy as np
+import math
 
 def get_column(table, index):
     return [row[index] for row in table]
@@ -87,3 +85,131 @@ def entropy(Y):
 def information_gain(y, y_true, y_false):
     """ The reduction in entropy from splitting data into two groups. """
     return entropy(y) - (entropy(y_true)*len(y_true) + entropy(y_false)*len(y_false))/len(y)
+
+
+
+def confusion_matrix(y_true, y_pred, labels):
+    """Compute confusion matrix to evaluate the accuracy of a classification.
+
+    Args:
+        y_true(list of obj): The ground_truth target y values
+            The shape of y is n_samples
+        y_pred(list of obj): The predicted target y values (parallel to y_true)
+            The shape of y is n_samples
+        labels(list of str): The list of all possible target y labels used to index the matrix
+
+    Returns:
+        matrix(list of list of int): Confusion matrix whose i-th row and j-th column entry
+            indicates the number of samples with true label being i-th class
+            and predicted label being j-th class
+
+    Notes:
+        Loosely based on sklearn's confusion_matrix():
+            https://scikit-learn.org/stable/modules/generated/sklearn.metrics.confusion_matrix.html
+    """
+    label_to_index = {label: idx for idx, label in enumerate(labels)}
+    n_labels = len(labels)
+    matrix = [[0] * n_labels for _ in range(n_labels)]
+    for t, p in zip(y_true, y_pred):
+        true_idx = label_to_index[t]
+        pred_idx = label_to_index[p]
+        matrix[true_idx][pred_idx] += 1
+    return matrix
+
+
+def train_test_split(X, y, test_size=0.33, random_state=None, shuffle=True):
+    """Split dataset into train and test sets based on a test set size.
+
+    Args:
+        X (list of list of obj): The list of samples
+            The shape of X is (n_samples, n_features)
+        y (list of obj): The target y values (parallel to X)
+            The shape of y is n_samples
+        test_size (float or int): float for proportion of dataset to be in test set (e.g., 0.33 for a 2:1 split)
+            or int for absolute number of instances to be in test set (e.g., 5 for 5 instances in test set)
+        random_state (int): Integer used for seeding a random number generator for reproducible results
+        shuffle (bool): Whether or not to randomize the order of the instances before splitting
+
+    Returns:
+        X_train (list of list of obj): The list of training samples
+        X_test (list of list of obj): The list of testing samples
+        y_train (list of obj): The list of target y values for training (parallel to X_train)
+        y_test (list of obj): The list of target y values for testing (parallel to X_test)
+    """
+    # Set seed for reproducibility
+    if random_state is not None:
+        np.random.seed(random_state)
+
+    # Input validation
+    if len(X) != len(y):
+        raise ValueError("The length of X and y must be the same")
+
+    n_samples = len(X)
+
+    # Determine the number of samples in the test set
+    if isinstance(test_size, float):
+        n_test = math.ceil(n_samples * test_size)
+    elif isinstance(test_size, int):
+        n_test = test_size
+    else:
+        raise ValueError("test_size must be a float or int")
+
+    if n_test <= 0 or n_test >= n_samples:
+        raise ValueError("test_size must be between 0 and the number of samples")
+
+    # Combine X and y to maintain their parallel structure during shuffling
+    combined = list(zip(X, y))
+
+    # Shuffle data if required
+    if shuffle:
+        np.random.shuffle(combined)
+
+    # Unzip combined list back to X and y
+    X, y = zip(*combined)
+
+    # Convert X and y back to lists since zip returns tuples
+    X = list(X)
+    y = list(y)
+
+    # Split the data into train and test sets
+    n_train = n_samples - n_test
+    X_train = X[:n_train]
+    X_test = X[n_train:]
+    y_train = y[:n_train]
+    y_test = y[n_train:]
+
+    return X_train, X_test, y_train, y_test
+
+
+
+def accuracy_score(y_true, y_pred, normalize=True):
+    """Compute the classification prediction accuracy score.
+
+    Args:
+        y_true(list of obj): The ground_truth target y values
+            The shape of y is n_samples
+        y_pred(list of obj): The predicted target y values (parallel to y_true)
+            The shape of y is n_samples
+        normalize(bool): If False, return the number of correctly classified samples.
+            Otherwise, return the fraction of correctly classified samples.
+
+    Returns:
+        score(float or int): If normalize == True, return the fraction of correctly classified samples (float),
+            else returns the number of correctly classified samples (int).
+
+    Notes:
+        Loosely based on sklearn's accuracy_score():
+            https://scikit-learn.org/stable/modules/generated/sklearn.metrics.accuracy_score.html
+    """
+    if not y_true:  # Check if y_true is empty
+        return 0.0 if normalize else 0
+
+    correct_count = sum(1 for true, pred in zip(y_true, y_pred) if true == pred)
+
+    if normalize:
+        return correct_count / len(y_true)
+    else:
+        return correct_count
+    
+
+
