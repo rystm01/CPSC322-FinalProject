@@ -22,6 +22,7 @@ import random
 from copy import deepcopy
 import os
 
+
 class MyKNeighborsClassifier:
     """Represents a simple k nearest neighbors classifier.
 
@@ -377,7 +378,6 @@ class MyDecisionTreeClassifier:
                 prediction = "OTHER"
             preds.append(prediction)
         return preds
-
 
     def print_decision_rules(self, attribute_names=None, class_name="class"):
         """Prints the decision rules from the tree."""
