@@ -7,8 +7,6 @@ import pickle
 app = Flask(__name__)
 
 
-
-
 @app.route("/", methods=['GET'])
 def index():
     return ' <form action="/predict" method="get" > \
