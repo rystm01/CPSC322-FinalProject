@@ -43,6 +43,8 @@ def predict():
     c1_pct = float(request.args.get('c1_poll'))
     c2_pct = float(request.args.get('c2_poll'))
 
+    print([c1_pct, c2_pct, c1_party, c2_party])
+
     with open('knn_model', 'rb') as file:
         knn = pickle.load(file)
     
