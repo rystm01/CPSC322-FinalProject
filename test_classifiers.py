@@ -14,6 +14,19 @@ import numpy as np
 from scipy import stats
 
 
+def compare_trees(tree1, tree2, path="Root"):
+    if tree1 == tree2:
+        return True, ""  # Trees match
+    if isinstance(tree1, list) and isinstance(tree2, list) and len(tree1) == len(tree2):
+        for i, (sub1, sub2) in enumerate(zip(tree1, tree2)):
+            match, info = compare_trees(sub1, sub2, f"{path} -> Index {i}")
+            if not match:
+                return False, info
+        return True, ""  # All elements match
+    return False, f"Mismatch at {path}: {tree1} != {tree2}"
+
+
+
 def test_decision_tree_classifier_fit():
     header_interview = ["level", "lang", "tweets", "phd", "interviewed_well"]
     X_train_interview = [
@@ -76,7 +89,42 @@ def test_decision_tree_classifier_fit():
 
     t = MyDecisionTreeClassifier()
     t.fit(X_train_interview, y_train_interview)
-    # assert t.tree == interview_tree_solution
+    compare_trees(t.tree,interview_tree_solution)
+    
+    X_train_iphone = [
+        [1, 3, "fair"],
+        [1, 3, "excellent"],
+        [2, 3, "fair"],
+        [2, 2, "fair"],
+        [2, 1, "fair"],
+        [2, 1, "excellent"],
+        [2, 1, "excellent"],
+        [1, 2, "fair"],
+        [1, 1, "fair"],
+        [2, 2, "fair"],
+        [1, 2, "excellent"],
+        [2, 2, "excellent"],
+        [2, 3, "fair"],
+        [2, 2, "excellent"],
+        [2, 3, "fair"],
+    ]
+    y_train_iphone = [
+        "no",
+        "no",
+        "yes",
+        "yes",
+        "yes",
+        "no",
+        "yes",
+        "no",
+        "yes",
+        "yes",
+        "yes",
+        "yes",
+        "yes",
+        "no",
+        "yes",
+    ]
 
     X_train_iphone = [
         [1, 3, "fair"],
@@ -112,6 +160,7 @@ def test_decision_tree_classifier_fit():
         "no",
         "yes",
     ]
+
 
     iphone_tree = [
         "Attribute",
@@ -170,7 +219,10 @@ def test_decision_tree_classifier_fit():
             ],
         ],
     ]
-
+    t = MyDecisionTreeClassifier()
+    t.fit(X_train_iphone, y_train_iphone)
+    print(t.tree)
+    compare_trees(t.tree,iphone_tree)
 
 def test_decision_tree_classifier_predict():
     header_interview = ["level", "lang", "tweets", "phd", "interviewed_well"]

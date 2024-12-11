@@ -325,224 +325,354 @@ class MyNaiveBayesClassifier:
 
         return y_predicted
 
+import numpy as np
+from copy import deepcopy
+import os
 
 class MyDecisionTreeClassifier:
-    """Represents a decision tree classifier.
-
-    Attributes:
-        X_train(list of list of obj): The list of training instances (samples).
-                The shape of X_train is (n_train_samples, n_features)
-        y_train(list of obj): The target y values (parallel to X_train).
-            The shape of y_train is n_samples
-        tree(nested list): The extracted tree model.
+    """
+    Represents a decision tree classifier built using TDIDT.
     """
 
     def __init__(self):
-        """Initializer for MyDecisionTreeClassifier."""
+        """
+        Initializes the decision tree classifier with default attributes.
+        """
         self.X_train = None
         self.y_train = None
+        self.header = None
+        self.attribute_domains = None
         self.tree = None
 
     def fit(self, X_train, y_train):
-        """Fits a decision tree classifier to X_train and y_train using TDIDT."""
+        """
+        Fits a decision tree classifier to the given training data using the TDIDT algorithm.
+
+        Parameters:
+        X_train (list of list): Training data features.
+        y_train (list): Training data labels.
+        """
+        self.X_train = X_train
+        self.y_train = y_train
         self.header = ["att" + str(i) for i in range(len(X_train[0]))]
+
+        # Determine attribute domains and sort them to ensure deterministic splits
         self.attribute_domains = {}
-        for att in self.header:
-            col = get_column(X_train, self.header.index(att))
-            col = list(set(col))
-            self.attribute_domains[att] = col
+        for i, att in enumerate(self.header):
+            col = self._get_column(X_train, i)
+            unique_vals = list(set(col))
+            unique_vals.sort()  # Ensure deterministic ordering
+            self.attribute_domains[att] = unique_vals
 
-        train = [X_train[i] + [y_train[i]] for i in range(len(y_train))]
-        availible_atts = deepcopy(self.header)
-        self.tree = self.tdidt(train, availible_atts)
-
-    def tdidt_predict(self, tree, instance):
-        """Uses the tree to make a prediction for a single instance."""
-        node_type = tree[0]
-        if node_type == "Leaf":
-            return tree[1]
-
-        # attribute node case, match instance val to right subtree
-        att_idx = self.header.index(tree[1])
-        for i in range(2, len(tree)):
-            if instance[att_idx] == tree[i][1]:
-                return self.tdidt_predict(tree[i][2], instance)
+        instance_indices = list(range(len(y_train)))
+        available_attributes = deepcopy(self.header)
+        self.tree = self._tdidt(instance_indices, available_attributes)
 
     def predict(self, X_test):
-        """Makes predictions for test instances in X_test."""
+        """
+        Predicts the labels for the given test data.
+
+        Parameters:
+        X_test (list of list): Test data features.
+
+        Returns:
+        list: Predicted labels for the test data.
+        """
         preds = []
         for val in X_test:
-            prediction = self.tdidt_predict(self.tree, val)
-            # Replace None with "Other"
-            if prediction is None:
-                prediction = "OTHER"
+            prediction = self._tdidt_predict(self.tree, val)
             preds.append(prediction)
         return preds
 
     def print_decision_rules(self, attribute_names=None, class_name="class"):
-        """Prints the decision rules from the tree."""
+        """
+        Prints the decision rules derived from the decision tree.
+
+        Parameters:
+        attribute_names (list, optional): Names of the attributes for better readability. Defaults to None.
+        class_name (str, optional): Name of the class label in the rules. Defaults to "class".
+        """
+        if attribute_names is None:
+            attribute_names = self.header
+
         rules = ""
         tree = deepcopy(self.tree)
-
-        for i in range(2, len(tree)):
-            rules += f"IF {tree[1]} == {tree[i][1]} "
-            rules += self.print_decision_rules_rec(tree[i], attribute_names, class_name)
-
+        # The top of the tree should be ["Attribute", attX, ...]
+        if tree[0] == "Attribute":
+            root_att_name = attribute_names[self.header.index(tree[1])]
+            for i in range(2, len(tree)):
+                rules += f"IF {root_att_name} == {tree[i][1]} "
+                rules += self._print_decision_rules_rec(tree[i][2], attribute_names, class_name)
         print(rules)
 
-    def print_decision_rules_rec(self, tree, attribute_names=None, class_name="class"):
-        if tree[0] == "Leaf":
-            return "THEN " + class_name + " = " + tree[1] + "\n"
+    def _print_decision_rules_rec(self, tree, attribute_names, class_name):
+        """
+        Recursively build decision rules from the tree.
+        """
+        node_type = tree[0]
+        if node_type == "Leaf":
+            return f"THEN {class_name} = {tree[1]}\n"
+        elif node_type == "Attribute":
+            rules = ""
+            att_name = attribute_names[self.header.index(tree[1])]
+            for i in range(2, len(tree)):
+                val = tree[i][1]
+                rules += f"AND {att_name} == {val} "
+                rules += self._print_decision_rules_rec(tree[i][2], attribute_names, class_name)
+            return rules
+        else:
+            return ""
 
-        rules = ""
-        for i in range(2, len(tree[2])):
-            rule = (
-                f" AND {tree[2][i]} == {tree[2][i]} "
-                + self.print_decision_rules_rec(tree[2][i], attribute_names, class_name)
-            )
-            rules += rule
-        return rules
-
-    # BONUS method
     def visualize_tree(self, dot_fname, pdf_fname, attribute_names=None):
-        """BONUS: Visualizes a tree with Graphviz."""
+        """
+        Visualizes the decision tree using Graphviz.
+
+        Parameters:
+        dot_fname (str): Filename for the Graphviz .dot file.
+        pdf_fname (str): Filename for the output PDF file.
+        attribute_names (list, optional): Names of the attributes for better readability. Defaults to None.
+        """
+        if attribute_names is None:
+            attribute_names = self.header
+
         self.part_count = 0
-        outfile = open(dot_fname, "w")
-        outfile.write("graph g {")
-        self.visualize_tree_rec(self.tree, outfile, attribute_names)
-        outfile.write("}")
-        os.popen(f"dot -Tpdf -o {pdf_fname} {dot_fname}")
+        with open(dot_fname, "w") as outfile:
+            outfile.write("graph g {\n")
+            self._visualize_tree_rec(self.tree, outfile, attribute_names)
+            outfile.write("}\n")
 
-        # TODO: Implement further if required
+        os.system(f"dot -Tpdf {dot_fname} -o {pdf_fname}")
 
-    def visualize_tree_rec(self, tree, outfile, attribute_names=None):
-        if tree[0] == "Attribute":
-            if attribute_names:
-                outfile.write(
-                    f"node{self.part_count}[shape=box, label={attribute_names[attribute_names.index(tree[1])]}];\n"
-                )
-            else:
-                outfile.write(f"node{self.part_count}[shape=box, label={tree[1]}];\n")
+    def _visualize_tree_rec(self, tree, outfile, attribute_names):
+        """
+        Prints the decision rules derived from the decision tree.
+
+        Parameters:
+        attribute_names (list, optional): Names of the attributes for better readability. Defaults to None.
+        class_name (str, optional): Name of the class label in the rules. Defaults to "class".
+        """
+        node_type = tree[0]
+        if node_type == "Attribute":
+            att_idx = self.header.index(tree[1])
+            label = attribute_names[att_idx]
+            outfile.write(f"node{self.part_count}[shape=box, label=\"{label}\"];\n")
+            node_id = self.part_count
+            self.part_count += 1
+            # For each value branch
+            for i in range(2, len(tree)):
+                val = tree[i][1]
+                outfile.write(f"node{node_id}--node{self.part_count}[label=\"{val}\"];\n")
+                child_id = self.part_count
+                self.part_count += 1
+                self._visualize_tree_child(tree[i][2], outfile, attribute_names, child_id)
+        elif node_type == "Leaf":
+            outfile.write(f"node{self.part_count}[shape=oval, label=\"{tree[1]}\"];\n")
             self.part_count += 1
 
-            for i in range(len(tree[2:])):
-                self.visualize_tree_rec(tree[i + 2], outfile, attribute_names)
+    def _visualize_tree_child(self, subtree, outfile, attribute_names, node_id):
+        """
+        Visualizes the decision tree using Graphviz.
 
-        elif tree[0] == "Value":
-            outfile.write(
-                f"node{self.part_count-1}--node{self.part_count}[label={tree[1]}]\n"
-            )
-            self.visualize_tree_rec(tree[2], outfile, attribute_names)
+        Parameters:
+        dot_fname (str): Filename for the Graphviz .dot file.
+        pdf_fname (str): Filename for the output PDF file.
+        attribute_names (list, optional): Names of the attributes for better readability. Defaults to None.
+        """
+        node_type = subtree[0]
+        if node_type == "Attribute":
+            att_idx = self.header.index(subtree[1])
+            label = attribute_names[att_idx]
+            outfile.write(f"node{node_id}[shape=box, label=\"{label}\"];\n")
+            parent_id = node_id
+            for i in range(2, len(subtree)):
+                val = subtree[i][1]
+                outfile.write(f"node{parent_id}--node{self.part_count}[label=\"{val}\"];\n")
+                child_id = self.part_count
+                self.part_count += 1
+                self._visualize_tree_child(subtree[i][2], outfile, attribute_names, child_id)
+        elif node_type == "Leaf":
+            outfile.write(f"node{node_id}[shape=oval, label=\"{subtree[1]}\"];\n")
 
-        elif tree[0] == "Leaf":
-            outfile.write(f"node{self.part_count}[label={tree[1]}];")
-            self.part_count += 1
+    def _tdidt(self, instance_indices, available_attributes):
+        """
+        Recursively builds the decision tree using the TDIDT algorithm.
 
-    def partition_instances(self, current_instances, att):
-        """Groups instances by attribute domain."""
-        att_idx = self.header.index(att)
-        att_domain = self.attribute_domains[att]
+        Parameters:
+        instance_indices (list): Indices of the current instances.
+        available_attributes (list): List of attributes available for splitting.
 
-        partitions = {}
-        for value in att_domain:
-            partitions[value] = []
-            for instance in current_instances:
-                if instance[att_idx] == value:
-                    partitions[value].append(instance)
-        return partitions
-
-    def split_attribute(self, current_instances, available_attributes):
-        """Chooses an attribute to split on using entropy-based selection."""
-        att_entropies = []
-        for att in available_attributes:
-            vals = []
-            val_entropies = []
-            posteriors = []
-            val_col = get_column(current_instances, self.header.index(att))
-            for val in self.attribute_domains[att]:
-                vals.append(val)
-                try:
-                    posteriors.append(
-                        sum(
-                            [
-                                1
-                                for i in range(len(val_col))
-                                if val_col[i] == val
-                                and current_instances[i][-1] == "True"
-                            ]
-                        )
-                        / sum([1 for i in val_col if i == val])
-                    )
-                except:
-                    posteriors.append(0)
-
-                # Entropy calculation
-                if posteriors[-1] not in [0, 1]:
-                    val_entropies.append(
-                        0
-                        - posteriors[-1] * np.log2(posteriors[-1])
-                        - (1 - posteriors[-1]) * np.log2(1 - posteriors[-1])
-                    )
-                else:
-                    val_entropies.append(0)
-
-            avg = 0
-            for i in range(len(vals)):
-                avg += (
-                    val_col.count(vals[i]) / len(current_instances)
-                ) * val_entropies[i]
-            att_entropies.append(avg)
-
-        # return attribute with smallest entropy
-        return available_attributes[att_entropies.index(min(att_entropies))]
-
-    def tdidt(self, current_instances, available_attributes):
-        """Constructs the decision tree using TDIDT."""
-        split_att = self.split_attribute(current_instances, available_attributes)
-        available_attributes.remove(split_att)
+        Returns:
+        list: The decision tree structure.
+        """
+        split_att = self._split_attribute(instance_indices, available_attributes)
+        available_attributes = [a for a in available_attributes if a != split_att]
         tree = ["Attribute", split_att]
 
-        partitions = self.partition_instances(current_instances, split_att)
+        partitions = self._partition_instances(instance_indices, split_att)
 
-        for value in partitions.keys():
-            att_partition = partitions[value]
+        current_size = len(instance_indices)
+        for value, subset_indices in partitions.items():
             val_subtree = ["Value", value]
-
-            # Case 1
-            if len(att_partition) > 1 and all_same_class(att_partition):
-                leaf = [
-                    "Leaf",
-                    att_partition[0][-1],
-                    get_column(current_instances, self.header.index(split_att)).count(
-                        value
-                    ),
-                    len(current_instances),
-                ]
+            if len(subset_indices) > 0 and self._all_same_class(subset_indices):
+                leaf_val = self.y_train[subset_indices[0]]
+                leaf = ["Leaf", leaf_val, len(subset_indices), current_size]
                 val_subtree.append(leaf)
                 tree.append(val_subtree)
 
-            # Case 2 (clash)
-            elif len(att_partition) > 0 and len(available_attributes) == 0:
-                vals, freqs = get_frequencies(get_column(current_instances, -1))
-                val = vals[freqs.index(max(freqs))]
-                leaf = ["Leaf", val, max(freqs), len(current_instances)]
+            elif len(subset_indices) > 0 and len(available_attributes) == 0:
+                # Majority class
+                vals, freqs = self._get_frequencies([self.y_train[i] for i in subset_indices])
+                majority_val = vals[freqs.index(max(freqs))]
+                leaf = ["Leaf", majority_val, max(freqs), current_size]
                 val_subtree.append(leaf)
                 tree.append(val_subtree)
 
-            # Case 3 (empty partition)
-            elif len(att_partition) == 0:
-                vals, freqs = get_frequencies(get_column(current_instances, -1))
-                val = vals[freqs.index(max(freqs))]
-                leaf = ["Leaf", val, max(freqs), len(current_instances)]
+            elif len(subset_indices) == 0:
+                # Empty partition - majority of parent's subset
+                vals, freqs = self._get_frequencies([self.y_train[i] for i in instance_indices])
+                majority_val = vals[freqs.index(max(freqs))]
+                leaf = ["Leaf", majority_val, max(freqs), current_size]
                 val_subtree.append(leaf)
                 tree.append(val_subtree)
-
             else:
-                subtree = self.tdidt(att_partition, available_attributes.copy())
+                subtree = self._tdidt(subset_indices, deepcopy(available_attributes))
                 val_subtree.append(subtree)
                 tree.append(val_subtree)
 
         return tree
+
+    def _tdidt_predict(self, tree, instance):
+        """
+        Makes a prediction for a single instance using the decision tree.
+
+        Parameters:
+        tree (list): The decision tree structure.
+        instance (list): Feature values of the instance.
+
+        Returns:
+        Any: The predicted class label.
+        """
+        node_type = tree[0]
+        if node_type == "Leaf":
+            return tree[1]
+        elif node_type == "Attribute":
+            att_name = tree[1]
+            att_idx = self.header.index(att_name)
+            instance_val = instance[att_idx]
+            for i in range(2, len(tree)):
+                if tree[i][1] == instance_val:
+                    return self._tdidt_predict(tree[i][2], instance)
+            # If no branch matches, return None or majority
+            return None
+
+    def _partition_instances(self, instance_indices, att):
+        """
+        Partitions the instances based on the given attribute.
+
+        Parameters:
+        instance_indices (list): Indices of the current instances.
+        att (str): Attribute name to partition on.
+
+        Returns:
+        dict: A dictionary mapping attribute values to subsets of indices.
+        """
+        att_idx = self.header.index(att)
+        partitions = {}
+        # Use the sorted domain we established
+        for val in self.attribute_domains[att]:
+            partitions[val] = []
+        for i in instance_indices:
+            val = self.X_train[i][att_idx]
+            partitions[val].append(i)
+        return partitions
+
+    def _split_attribute(self, instance_indices, available_attributes):
+        """
+        Determines the best attribute to split the instances on based on entropy.
+
+        Parameters:
+        instance_indices (list): Indices of the current instances.
+        available_attributes (list): List of available attributes for splitting.
+
+        Returns:
+        str: The attribute with the lowest entropy.
+        """
+        att_entropies = []
+        for att in available_attributes:
+            ent = self._attribute_entropy(instance_indices, att)
+            att_entropies.append(ent)
+        # Choose attribute with smallest entropy
+        min_entropy_idx = att_entropies.index(min(att_entropies))
+        return available_attributes[min_entropy_idx]
+
+    def _attribute_entropy(self, instance_indices, att):
+        """
+        Calculates the entropy of an attribute.
+
+        Parameters:
+        instance_indices (list): Indices of the current instances.
+        att (str): Attribute name to calculate entropy for.
+
+        Returns:
+        float: The entropy value.
+        """
+        partitions = self._partition_instances(instance_indices, att)
+        total = len(instance_indices)
+        entropy = 0.0
+        for val, subset in partitions.items():
+            if len(subset) == 0:
+                continue
+            subset_labels = [self.y_train[i] for i in subset]
+            vals, freqs = self._get_frequencies(subset_labels)
+            subset_entropy = 0.0
+            for f in freqs:
+                p = f / len(subset)
+                if p > 0:
+                    subset_entropy -= p * np.log2(p)
+            entropy += (len(subset) / total) * subset_entropy
+        return entropy
+
+    def _get_column(self, matrix, col_index):
+        """
+        Extracts a column from a matrix.
+
+        Parameters:
+        matrix (list of list): The matrix to extract the column from.
+        col_index (int): The column index.
+
+        Returns:
+        list: The extracted column.
+        """
+        return [row[col_index] for row in matrix]
+
+    def _all_same_class(self, instance_indices):
+        """
+        Checks if all instances belong to the same class.
+
+        Parameters:
+        instance_indices (list): Indices of the current instances.
+
+        Returns:
+        bool: True if all instances have the same class label, False otherwise.
+        """
+        if len(instance_indices) == 0:
+            return True
+        first_label = self.y_train[instance_indices[0]]
+        return all(self.y_train[i] == first_label for i in instance_indices)
+
+    def _get_frequencies(self, values):
+        """
+        Computes the frequency of each unique value in a list.
+
+        Parameters:
+        values (list): List of values.
+
+        Returns:
+        tuple: A tuple containing the unique values and their frequencies.
+        """
+        vals = list(set(values))
+        freqs = [values.count(v) for v in vals]
+        return vals, freqs
 
 
 class RandomForestClassifier:
