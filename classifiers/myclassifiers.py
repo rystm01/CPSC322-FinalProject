@@ -6,7 +6,6 @@ Ryan St. Mary
 
 from __future__ import division
 
-from classifiers import myutils
 import random
 import numpy as np
 from scipy.stats import mode

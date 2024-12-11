@@ -181,8 +181,7 @@ def train_test_split(X, y, test_size=0.33, random_state=None, shuffle=True):
     y_test = y[n_train:]
 
     return X_train, X_test, y_train, y_test
-<<<<<<< HEAD
-=======
+
 
 
 
@@ -280,4 +279,3 @@ def cross_val_predict(X, y, stratify=False, k=10):
     return knn_acc, dummy_acc, nb_acc, y_true, all_knn_preds, all_dummy_preds, all_nb_preds
 
 
->>>>>>> main
