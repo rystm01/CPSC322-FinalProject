@@ -368,6 +368,7 @@ class MyDecisionTreeClassifier:
         available_attributes = deepcopy(self.header)
         self.tree = self._tdidt(instance_indices, available_attributes)
 
+
     def predict(self, X_test):
         """
         Predicts the labels for the given test data.
