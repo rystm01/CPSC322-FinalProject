@@ -6,6 +6,8 @@ Ryan St. Mary
 from __future__ import division
 from collections import Counter
 import random
+import classifiers.myevaluation as myevaluation
+import classifiers.myclassifiers as myclassifiers
 import numpy as np
 import math
 
@@ -210,6 +212,69 @@ def accuracy_score(y_true, y_pred, normalize=True):
         return correct_count / len(y_true)
     else:
         return correct_count
+  
+
+
+
+def cross_val_predict(X, y, stratify=False, k=10):
+    """
+    Runs the knn, Naive Bayes and dummy classifiers on X and y using k fold split
+
+    input: X (list of list): X data
+    y (list): list of labels
+    stratify (bool): whether or not to use stratified kfold
+    k (int): how many folds to use
+
+    output:
+    knn_acc, knn_err, dummy_acc, dummy_err (floats):
+    respective accuracy and error of each model
+
+    """
+    if stratify:
+        folds = myevaluation.stratified_kfold_split(X, y, k)
+    else:
+        folds = myevaluation.kfold_split(X, k)
     
+    y_true = []
+    all_knn_preds = []
+    all_dummy_preds = []
+    all_nb_preds = []
+    knn = myclassifiers.MyKNeighborsClassifier()
+    dummy = myclassifiers.MyDummyClassifier()
+    nb = myclassifiers.MyNaiveBayesClassifier()
+    knn_acc = 0
+    dummy_acc = 0
+    nb_acc = 0
+    for fold in folds:
+        X_train = [X[i] for i in fold[0]]
+        y_train = [y[i] for i in fold[0]]
+        X_test = [X[i] for i in fold[1]]
+        y_test = [y[i] for i in fold[1]]
+        knn.fit(X_train, y_train)
+        dummy.fit(0, y_train)
+        nb.fit(X_train, y_train)
+
+        knn_pred = knn.predict(X_test, categorical=True)
+        knn_acc += myevaluation.accuracy_score(y_test, knn_pred, normalize=False)
+
+        dummy_pred = dummy.predict(X_test)
+        dummy_acc += myevaluation.accuracy_score(y_test, dummy_pred, normalize=False)
+
+        nb_pred = nb.predict(X_test)
+        nb_acc += myevaluation.accuracy_score(y_test, nb_pred, normalize=False)
+
+        y_true += y_test
+        all_knn_preds += knn_pred
+        all_dummy_preds += dummy_pred
+        all_nb_preds += nb_pred
+
+
+    
+    knn_acc /= len(X)
+    dummy_acc /= len(X)
+    nb_acc /= len(X)
+    
+
+    return knn_acc, dummy_acc, nb_acc, y_true, all_knn_preds, all_dummy_preds, all_nb_preds
 
 
